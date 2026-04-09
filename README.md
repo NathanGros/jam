@@ -1,7 +1,5 @@
-# Huffman compression
-
-## Project
-A lossless text files compression tool written in C, using Huffman compression.
+# The jam compressor
+Jam is a lossless text file compression tool written in C, using Huffman compression.
 
 ## Usage
 ```sh
