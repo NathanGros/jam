@@ -6,19 +6,35 @@
 #include "huffman_tree.h"
 
 void print_usage() {
-    printf("Usage: decompress <infile> <outfile>\n");
+    printf("Usage: unjam <input> [output]\n");
 }
 
 int main(int argc, char *argv[]) {
+    char input_file[512];
+    char output_file[512];
+    switch (argc) {
+        case 2:
+            strcpy(input_file, argv[1]);
+            strcpy(output_file, argv[1]);
+            // Remove .jam extension
+            if (strcmp(output_file + strlen(output_file) - 4, ".jam") != 0) {
+                printf("Error: Input file is not jammed.\n");
+                print_usage();
+                exit(1);
+            }
+            strcpy(output_file + strlen(output_file) - 4, "");
+            break;
+        case 3:
+            strcpy(input_file, argv[1]);
+            strcpy(output_file, argv[2]);
+            break;
+        default:
+            print_usage();
+            exit(1);
+    }
+
     int print_time = 1;
     clock_t timer_start;
-
-    if (argc != 3) {
-        print_usage();
-        exit(1);
-    }
-    const char *input_file = argv[1];
-    const char *output_file = argv[2];
     
     if (print_time)
         timer_start = clock();
@@ -31,5 +47,6 @@ int main(int argc, char *argv[]) {
         double elapsed = (double)(clock() - timer_start) / CLOCKS_PER_SEC;
         printf("Decompression time: %fs\n", elapsed);
     }
+
     return 0;
 }

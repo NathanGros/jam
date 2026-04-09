@@ -1,8 +1,21 @@
 # Huffman compression
 
 ## Project
-A compression tool for text files written in C, using Huffman compression.
-I used binary trees and queues for this project.
+A lossless text files compression tool written in C, using Huffman compression.
+
+## Usage
+```sh
+$ jam <input> [output]
+$ unjam <input> [output]
+```
+
+### Examples
+
+`$ jam file.txt` will produce the jammed file `file.txt.jam`.
+`$ jam file.txt output` will produce the jammed file `output`.
+
+`$ unjam file.txt.jam` will produce the unjammed file `file.txt`.
+`$ unjam file.txt.jam output` will produce the unjammed file `output`.
 
 ## Results
 The ratio `compressed_size / original_size` gets smaller as the original size gets bigger.

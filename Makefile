@@ -8,13 +8,13 @@ COMMON = huffman_tree.o input_output.o queue.o
 COMPRESSOR = compressor.o $(COMMON)
 DECOMPRESSOR = decompressor.o $(COMMON)
 
-all: compress decompress softclean
+all: jam unjam softclean
 
-compress: $(COMPRESSOR)
+jam: $(COMPRESSOR)
 	@echo "Compiling compressor..."
 	@$(CC) $^ -o $@ $(LDFLAGS)
 
-decompress: $(DECOMPRESSOR)
+unjam: $(DECOMPRESSOR)
 	@echo "Compiling decompressor..."
 	@$(CC) $^ -o $@ $(LDFLAGS)
 
@@ -26,4 +26,4 @@ softclean:
 
 clean:
 	@echo "Cleaning up..."
-	@rm -f *.o compress decompress
+	@rm -f *.o jam unjam

@@ -1,21 +1,32 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "input_output.h"
 #include "queue.h"
 #include "huffman_tree.h"
 
 void print_usage() {
-    printf("Usage: compress <infile> <outfile>\n");
+    printf("Usage: jam <input> [output]\n");
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        print_usage();
-        exit(1);
+    char input_file[512];
+    char output_file[512];
+    switch (argc) {
+        case 2:
+            strcpy(input_file, argv[1]);
+            strcpy(output_file, argv[1]);
+            strcat(output_file, ".jam");
+            break;
+        case 3:
+            strcpy(input_file, argv[1]);
+            strcpy(output_file, argv[2]);
+            break;
+        default:
+            print_usage();
+            exit(1);
     }
-    const char *input_file = argv[1];
-    const char *output_file = argv[2];
     
     // Build queue<char, int> from input
     queue_t *occurences = get_occurences(input_file);
@@ -28,5 +39,6 @@ int main(int argc, char *argv[]) {
 
     // Generate output: encoding table + encoded text
     write_compressed_output(character_encodings, input_file, output_file);
+
     return 0;
 }
