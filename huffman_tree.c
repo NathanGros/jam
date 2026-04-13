@@ -72,24 +72,27 @@ void insert_sorted(queue_t *trees, huffman_tree_t *tree) {
     free(new_queue);
 }
 
-queue_t *queue_to_trees(queue_t *character_occurences) {
+queue_t *occurences_to_trees(int *character_occurences) {
     queue_t *trees = queue_create();
-    while (!queue_is_empty(character_occurences)) {
+    for (int i = 0; i < 256; i++) {
+        if (character_occurences[i] == 0)
+            continue;
         huffman_tree_t *leaf = malloc(sizeof(huffman_tree_t));
-        occurences_t *occurences = queue_pop(character_occurences);
-        leaf->character = occurences->character;
-        leaf->occurences = occurences->occurences;
+        char *character = malloc(2 * sizeof(char));
+        character[0] = (char) i;
+        character[1] = '\0';
+        leaf->character = character;
+        leaf->occurences = character_occurences[i];
         leaf->left = NULL;
         leaf->right = NULL;
-        free(occurences);
         insert_sorted(trees, leaf);
     }
     free(character_occurences);
     return trees;
 }
 
-huffman_tree_t *build_huffman_tree(queue_t *character_occurences) {
-    queue_t *trees = queue_to_trees(character_occurences);
+huffman_tree_t *build_huffman_tree(int *character_occurences) {
+    queue_t *trees = occurences_to_trees(character_occurences);
     while (trees->head != trees->tail) {
         huffman_tree_t *tree1 = queue_pop(trees);
         huffman_tree_t *tree2 = queue_pop(trees);
@@ -105,15 +108,14 @@ huffman_tree_t *build_huffman_tree(queue_t *character_occurences) {
     return tree;
 }
 
-void build_encodings_rec(huffman_tree_t *tree, queue_t *encodings, char *buf, int buf_size) {
+void build_encodings_rec(huffman_tree_t *tree, char **encodings, char *buf, int buf_size) {
     if (tree->character != NULL) {
-        character_encoding_t *encoding = malloc(sizeof(character_encoding_t));
-        encoding->character = tree->character;
-        free(tree);
         char *new_buf = malloc((buf_size) * sizeof(char));
         strcpy(new_buf, buf);
-        encoding->encoding = new_buf;
-        queue_push(encodings, encoding);
+        unsigned char c = tree->character[0];
+        encodings[(int) c] = new_buf;
+        free(tree->character);
+        free(tree);
         return;
     }
 
@@ -130,10 +132,8 @@ void build_encodings_rec(huffman_tree_t *tree, queue_t *encodings, char *buf, in
     free(tree);
 }
 
-queue_t *build_encodings(huffman_tree_t *tree) {
-    queue_t *encodings = queue_create();
-    build_encodings_rec(tree, encodings, "", 1);
-    return encodings;
+void build_encodings(huffman_tree_t *tree, char **character_encodings) {
+    build_encodings_rec(tree, character_encodings, "", 1);
 }
 
 void free_encodings_tree(huffman_tree_t *tree) {

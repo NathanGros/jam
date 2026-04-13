@@ -5,7 +5,7 @@
 #include "huffman_tree.h"
 #include "queue.h"
 
-queue_t *get_occurences(const char *input_file);
-void write_compressed_output(queue_t *character_encodings, const char *input_file, const char *output_file);
+void get_occurences(const char *input_file, int *occurences);
+void write_compressed_output(char **character_encodings, const char *input_file, const char *output_file);
 
 #endif

@@ -18,8 +18,8 @@ typedef struct huffman_tree_node huffman_tree_t;
 
 void print_tree(huffman_tree_t *tree);
 huffman_tree_t *huffman_tree_create();
-huffman_tree_t *build_huffman_tree(queue_t *character_occurences);
-queue_t *build_encodings(huffman_tree_t *tree);
+huffman_tree_t *build_huffman_tree(int *character_occurences);
+void build_encodings(huffman_tree_t *tree, char **character_encodings);
 void free_encodings_tree(huffman_tree_t *tree);
 
 #endif

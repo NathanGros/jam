@@ -5,6 +5,8 @@
 #include "decompress.h"
 #include "huffman_tree.h"
 
+#define DEBUG 0
+
 void print_usage() {
     printf("Usage: unjam <input> [output]\n");
 }
@@ -33,20 +35,32 @@ int main(int argc, char *argv[]) {
             exit(1);
     }
 
-    int print_time = 0;
     clock_t timer_start;
-    if (print_time)
+    clock_t timer_current;
+    if (DEBUG) {
         timer_start = clock();
+        timer_current = timer_start;
+    }
 
     // Retrieve encodings tree from the compressed file header
     huffman_tree_t *encodings_tree = retrieve_encodings(input_file);
+    if (DEBUG) {
+        double elapsed = (double)(clock() - timer_current) / CLOCKS_PER_SEC;
+        timer_current = clock();
+        printf("Retrieved encodings in %fs\n", elapsed);
+    }
 
     // Decompress and write to the output file
     write_decompressed_output(encodings_tree, input_file, output_file);
-    if (print_time) {
-        double elapsed = (double)(clock() - timer_start) / CLOCKS_PER_SEC;
-        printf("Decompression time: %fs\n", elapsed);
+    if (DEBUG) {
+        double elapsed = (double)(clock() - timer_current) / CLOCKS_PER_SEC;
+        timer_current = clock();
+        printf("Decompressed in %fs\n", elapsed);
     }
 
+    if (DEBUG) {
+        double elapsed = (double)(clock() - timer_start) / CLOCKS_PER_SEC;
+        printf("Total: %fs\n", elapsed);
+    }
     return 0;
 }

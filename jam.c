@@ -4,8 +4,9 @@
 #include <time.h>
 
 #include "compress.h"
-#include "queue.h"
 #include "huffman_tree.h"
+
+#define DEBUG 0
 
 void print_usage() {
     printf("Usage: jam <input> [output]\n");
@@ -29,17 +30,20 @@ int main(int argc, char *argv[]) {
             exit(1);
     }
     
-    int print_time = 0;
     clock_t timer_start;
     clock_t timer_current;
-    if (print_time) {
+    if (DEBUG) {
         timer_start = clock();
         timer_current = timer_start;
     }
 
-    // Build queue<char, int> from input
-    queue_t *occurences = get_occurences(input_file);
-    if (print_time) {
+    // Build occurences from input
+    int *occurences = malloc(256 * sizeof(int));
+    for (int i = 0; i < 256; i++) {
+        occurences[i] = 0;
+    }
+    get_occurences(input_file, occurences);
+    if (DEBUG) {
         double elapsed = (double)(clock() - timer_current) / CLOCKS_PER_SEC;
         timer_current = clock();
         printf("Got occurences queue in %fs\n", elapsed);
@@ -47,15 +51,19 @@ int main(int argc, char *argv[]) {
 
     // Build Huffman tree from queue
     huffman_tree_t *tree = build_huffman_tree(occurences);
-    if (print_time) {
+    if (DEBUG) {
         double elapsed = (double)(clock() - timer_current) / CLOCKS_PER_SEC;
         timer_current = clock();
         printf("Built Huffman tree in %fs\n", elapsed);
     }
 
     // Build queue<character, encoding> from Huffman tree
-    queue_t *character_encodings = build_encodings(tree);
-    if (print_time) {
+    char **character_encodings = malloc(256 * sizeof(char*));
+    for (int i = 0; i < 256; i++) {
+        character_encodings[i] = NULL;
+    }
+    build_encodings(tree, character_encodings);
+    if (DEBUG) {
         double elapsed = (double)(clock() - timer_current) / CLOCKS_PER_SEC;
         timer_current = clock();
         printf("Built encodings in %fs\n", elapsed);
@@ -63,11 +71,15 @@ int main(int argc, char *argv[]) {
 
     // Generate output: encoding table + encoded text
     write_compressed_output(character_encodings, input_file, output_file);
-    if (print_time) {
+    if (DEBUG) {
         double elapsed = (double)(clock() - timer_current) / CLOCKS_PER_SEC;
         timer_current = clock();
         printf("wrote output in %fs\n", elapsed);
     }
 
+    if (DEBUG) {
+        double elapsed = (double)(clock() - timer_start) / CLOCKS_PER_SEC;
+        printf("Total: %fs\n", elapsed);
+    }
     return 0;
 }
