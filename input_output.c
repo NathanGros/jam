@@ -1,10 +1,43 @@
 #include "input_output.h"
 #include "huffman_tree.h"
+#include "queue.h"
+#include <stdio.h>
 #include <unistd.h>
 
-/***************
- * Compression *
- ***************/
+# define IO_BUF_SIZE 512
+char read_buffer[IO_BUF_SIZE];
+int read_buffer_index;
+int read_buffer_length;
+char write_buffer[IO_BUF_SIZE];
+int write_buffer_index;
+
+void write_to_buffer(int fd_dst, char c) {
+    write_buffer[write_buffer_index] = c;
+    write_buffer_index += 1;
+    // Write IO_BUF_SIZE chars at once when the write buffer is full
+    if (write_buffer_index >= IO_BUF_SIZE) {
+        write(fd_dst, write_buffer, IO_BUF_SIZE);
+        write_buffer_index = 0;
+    }
+}
+
+void flush_write_buffer(int fd_dst) {
+    write(fd_dst, write_buffer, write_buffer_index);
+}
+
+int read_from_buffer(int fd_src, char *c) {
+    if (read_buffer_index >= IO_BUF_SIZE) {
+        read_buffer_length = read(fd_src, read_buffer, IO_BUF_SIZE);
+        if (read_buffer_length < 0)
+            return 0;
+        read_buffer_index = 0;
+    }
+    if (read_buffer_length < IO_BUF_SIZE && read_buffer_index >= read_buffer_length)
+        return 0;
+    c[0] = read_buffer[read_buffer_index];
+    read_buffer_index++;
+    return 1;
+}
 
 int open_input_file(const char *src) {
     // Open src
@@ -12,6 +45,8 @@ int open_input_file(const char *src) {
     if (fd_src == -1) {
         printf("Error: cannot open file \"%s\"\n", src);
     }
+    read_buffer_length = 0;
+    read_buffer_index = IO_BUF_SIZE;
     return fd_src;
 }
 
@@ -21,46 +56,21 @@ int open_output_file(const char *dst) {
     if (fd_dst == -1) {
         printf("Error: cannot create \"%s\"\n", dst);
     }
+    write_buffer_index = 0;
     return fd_dst;
 }
 
-void add_new_entry(queue_t *queue, char *c) {
+
+
+/***************
+ * Compression *
+ ***************/
+
+void add_new_occurence_count(queue_t *queue, char *c, int n) {
     occurences_t *entry = malloc(sizeof(occurences_t));
     entry->character = c;
-    entry->occurences = 1;
+    entry->occurences = n;
     queue_push(queue, entry);
-}
-
-void add_occurence(queue_t *occurences, char *c) {
-    if (queue_is_empty(occurences)) {
-        add_new_entry(occurences, c);
-        return;
-    }
-    queue_t *new_queue = queue_create();
-    while (1) {
-        if (queue_is_empty(occurences)) { // c is not already in occurences
-            add_new_entry(occurences, c);
-            break;
-        }
-        occurences_t *compare_occurence = queue_pop(occurences);
-        if (strcmp(compare_occurence->character, c) != 0) {
-            queue_push(new_queue, compare_occurence);
-            continue;
-        }
-        free(c);
-        compare_occurence->occurences++;
-        queue_push_head(occurences, compare_occurence);
-        break;
-    }
-    // "Merging" the queues together
-    if (queue_is_empty(new_queue)) {
-        // If the occurence was the first element then new_queue is empty and can't be merged normally
-        free(new_queue);
-        return;
-    }
-    new_queue->tail->next = occurences->head;
-    occurences->head = new_queue->head;
-    free(new_queue);
 }
 
 queue_t *get_occurences(const char *input_file) {
@@ -70,58 +80,56 @@ queue_t *get_occurences(const char *input_file) {
         exit(1);
 
     // Count occurences
-    queue_t *occurences = queue_create();
-    char buffer[3];
-    while (read(fd_src, buffer, 1) > 0) {
-        buffer[1] = '\0';
-        if (buffer[0] == '\0') { // buffer="\0"
-            buffer[0] = '\\';
-            buffer[1] = '0';
-            buffer[2] = '\0';
-        }
-        char *character = malloc(3 * sizeof(char));
-        strcpy(character, buffer);
-        add_occurence(occurences, character);
+    int *occurences_table = malloc(256 * sizeof(int));
+    unsigned char c;
+    char read_buf[1];
+    while (read_from_buffer(fd_src, read_buf)) {
+        c = read_buf[0];
+        occurences_table[(int) c] += 1;
     }
+    close(fd_src);
+
+    // Build queue
+    queue_t *occurences = queue_create();
+    for (int ch = 0; ch < 256; ch++) {
+        if (occurences_table[ch] != 0) {
+            char *character = malloc(3 * sizeof(char));
+            character[0] = (char) ch;
+            character[1] = '\0';
+            add_new_occurence_count(occurences, character, occurences_table[ch]);
+        }
+    }
+    free(occurences_table);
 
     // Adding \0 character
     char *character = malloc(3 * sizeof(char));
     character[0] = '\\';
     character[1] = '0';
     character[2] = '\0';
-    add_occurence(occurences, character);
+    add_new_occurence_count(occurences, character, 1);
 
-    close(fd_src);
     return occurences;
 }
 
 void write_encoding(character_encoding_t *encoding, int fd_dst) {
     char character[3];
     strcpy(character, encoding->character);
-    if (strcmp(character, "\\0") == 0) {
-        char buffer[1];
-        buffer[0] = '\0';
-        write(fd_dst, buffer, 1);
-    } else {
-        write(fd_dst, character, 1);
-    }
+    if (strcmp(character, "\\0") == 0)
+        character[0] = '\0';
+    write_to_buffer(fd_dst, character[0]);
     char *character_encoding = encoding->encoding;
-    write(fd_dst, character_encoding, strlen(character_encoding));
-    char separation[1];
-    separation[0] = '\0';
-    write(fd_dst, separation, 1);
+    for (int i = 0; i < strlen(character_encoding); i++) {
+        write_to_buffer(fd_dst, character_encoding[i]);
+    }
+    write_to_buffer(fd_dst, '\0');
 }
 
 void write_encodings(queue_t *encodings, int fd_dst) {
     if (queue_is_empty(encodings)) {
         return;
     }
-
     queue_t *new_queue = queue_create();
-    while (1) {
-        if (queue_is_empty(encodings)) { // End
-            break;
-        }
+    while (!queue_is_empty(encodings)) {
         character_encoding_t *encoding = queue_pop(encodings);
         write_encoding(encoding, fd_dst);
         queue_push(new_queue, encoding);
@@ -134,10 +142,8 @@ void write_encodings(queue_t *encodings, int fd_dst) {
 
 void write_header(queue_t *encodings, int fd_dst) {
     write_encodings(encodings, fd_dst);
-    char header_end[2];
-    header_end[0] = '\0';
-    header_end[1] = '\0';
-    write(fd_dst, header_end, 2);
+    write_to_buffer(fd_dst, '\0');
+    write_to_buffer(fd_dst, '\0');
 }
 
 char *get_encoding(queue_t *encodings, char *c, int *encoding_size) {
@@ -205,23 +211,17 @@ void convert_add_to_byte_buffer(int fd_dst, queue_t *character_encodings, char *
         add_bit(byte_buf, byte_buf_size, encoded[i]);
         if (*byte_buf_size == 8) {
             *byte_buf_size = 0;
-            char byte_to_write[1];
-            byte_to_write[0] = *byte_buf;
-            write(fd_dst, byte_to_write, 1);
+            write_to_buffer(fd_dst, byte_buf[0]);
         }
     }
 }
 
-void flush_write_byte_buffer(int fd_dst, char *byte_buf, int *byte_buf_size) {
-    while (*byte_buf_size != 0) {
+void flush_buffers(int fd_dst, char *byte_buf, int *byte_buf_size) {
+    while (*byte_buf_size != 8) {
         add_bit(byte_buf, byte_buf_size, '0');
-        if (*byte_buf_size == 8) {
-            *byte_buf_size = 0;
-            char byte_to_write[1];
-            byte_to_write[0] = *byte_buf;
-            write(fd_dst, byte_to_write, 1);
-        }
     }
+    write_to_buffer(fd_dst, byte_buf[0]);
+    flush_write_buffer(fd_dst);
 }
 
 void write_compressed_output(queue_t *character_encodings, const char *input_file, const char *output_file) {
@@ -238,18 +238,19 @@ void write_compressed_output(queue_t *character_encodings, const char *input_fil
     // Write encodings table header
     write_header(character_encodings, fd_dst);
 
-    // Convert then write encodings by adding converted bits one by one into a char (byte), then write the char when it is "full"
     char byte_buf;
     int byte_buf_size = 0;
-    char buffer[3];
-    while (read(fd_src, buffer, 1) > 0) {
-        buffer[1] = '\0';
-        if (buffer[0] == '\0') { // buffer="\0"
-            buffer[0] = '\\';
-            buffer[1] = '0';
-            buffer[2] = '\0';
+    char char_buffer[3];
+    char read_buf[1];
+    while (read_from_buffer(fd_src, read_buf)) {
+        char_buffer[0] = read_buf[0];
+        char_buffer[1] = '\0';
+        if (char_buffer[0] == '\0') { // char_buffer="\0"
+            char_buffer[0] = '\\';
+            char_buffer[1] = '0';
+            char_buffer[2] = '\0';
         }
-        convert_add_to_byte_buffer(fd_dst, character_encodings, buffer, &byte_buf, &byte_buf_size);
+        convert_add_to_byte_buffer(fd_dst, character_encodings, char_buffer, &byte_buf, &byte_buf_size);
     }
 
     // Writing \0 character
@@ -260,7 +261,7 @@ void write_compressed_output(queue_t *character_encodings, const char *input_fil
     convert_add_to_byte_buffer(fd_dst, character_encodings, eof_buf, &byte_buf, &byte_buf_size);
 
     // Flush remaining bits in the byte
-    flush_write_byte_buffer(fd_dst, &byte_buf, &byte_buf_size);
+    flush_buffers(fd_dst, &byte_buf, &byte_buf_size);
 
     close(fd_src);
     close(fd_dst);
@@ -271,7 +272,29 @@ void write_compressed_output(queue_t *character_encodings, const char *input_fil
  * Decompression *
  *****************/
 
-# define IO_BUF_SIZE 512
+void grow_encodings_tree(huffman_tree_t **current_node, char *read_buf) {
+    if (read_buf[0] == '0') {
+        if ((*current_node)->left == NULL)
+            (*current_node)->left = huffman_tree_create();
+        *current_node = (*current_node)->left;
+    } else {
+        if ((*current_node)->right == NULL)
+            (*current_node)->right = huffman_tree_create();
+        *current_node = (*current_node)->right;
+    }
+}
+
+void add_tree_encoding(huffman_tree_t *current_node, char c) {
+    char *character_buf = malloc(3 * sizeof(char));
+    character_buf[0] = c;
+    character_buf[1] = '\0';
+    if (character_buf[0] == '\0') {
+        character_buf[0] = '\\';
+        character_buf[1] = '0';
+        character_buf[2] = '\0';
+    }
+    current_node->character = character_buf;
+}
 
 huffman_tree_t *retrieve_encodings(const char *input_file) {
     int fd_src = open_input_file(input_file);
@@ -281,66 +304,81 @@ huffman_tree_t *retrieve_encodings(const char *input_file) {
     huffman_tree_t *encodings_tree = huffman_tree_create();
     huffman_tree_t *current_node = encodings_tree;
 
-    // Read header
     int nb_consecutive_stops = 1;
     int is_separator = 1;
-    char buffer[IO_BUF_SIZE];
-    int buffer_index = IO_BUF_SIZE;
     char character;
-    int end_of_header = 0;
-    while (!end_of_header) {
-        if (buffer_index >= IO_BUF_SIZE) {
-            buffer_index = 0;
-            if (read(fd_src, buffer, IO_BUF_SIZE) < 0) {
-                break;
-            }
+    char read_buf[1];
+    while (1) {
+        if (!read_from_buffer(fd_src, read_buf)) {
+            break;
         }
-
         if (is_separator) { // Character
-            character = buffer[buffer_index];
+            character = read_buf[0];
         }
-        if (!is_separator && buffer[buffer_index] != '\0') { // Encoding sequence
-            if (buffer[buffer_index] == '0') {
-                if (current_node->left == NULL)
-                    current_node->left = huffman_tree_create();
-                current_node = current_node->left;
-            } else {
-                if (current_node->right == NULL)
-                    current_node->right = huffman_tree_create();
-                current_node = current_node->right;
-            }
+        if (!is_separator && read_buf[0] != '\0') { // Encoding sequence
+            grow_encodings_tree(&current_node, read_buf);
         }
-        if (!is_separator && nb_consecutive_stops < 1 && buffer[buffer_index] == '\0') { // Separator
-            char *character_buf = malloc(3 * sizeof(char));
-            character_buf[0] = character;
-            character_buf[1] = '\0';
-            if (character_buf[0] == '\0') {
-                character_buf[0] = '\\';
-                character_buf[1] = '0';
-                character_buf[2] = '\0';
-            }
-            current_node->character = character_buf;
+        if (!is_separator && nb_consecutive_stops < 1 && read_buf[0] == '\0') { // Separator
+            add_tree_encoding(current_node, character);
             current_node = encodings_tree;
             is_separator = 1;
         } else {
             is_separator = 0;
         }
 
-        if (buffer[buffer_index] == '\0')
+        if (read_buf[0] == '\0')
             nb_consecutive_stops++;
         else
             nb_consecutive_stops = 0;
         if (nb_consecutive_stops >= 3) {
-            end_of_header = 1;
+            break;
         }
-        buffer_index++;
     }
     close(fd_src);
     return encodings_tree;
 }
 
-void flush_write_buffer(int fd_dst, char *write_buffer, int nb_to_write) {
-    write(fd_dst, write_buffer, nb_to_write);
+void process_bit(int fd_dst, int *found_eof, huffman_tree_t *encodings_tree, huffman_tree_t **current_node, int bit) {
+    if (bit == 0)
+        *current_node = (*current_node)->left;
+    else
+        *current_node = (*current_node)->right;
+    if ((*current_node)->character != NULL) {
+        if (strcmp((*current_node)->character, "\\0") == 0) {
+            *found_eof = 1;
+            flush_write_buffer(fd_dst);
+        }
+        write_to_buffer(fd_dst, (*current_node)->character[0]);
+        *current_node = encodings_tree;
+    }
+}
+
+void decode_byte(int fd_dst, int *found_eof, huffman_tree_t *encodings_tree, huffman_tree_t **current_node, unsigned char byte) {
+    int byte_int = byte;
+    int power = 128;
+    for (int i = 0; i < 8; i++) {
+        int bit = byte_int / power;
+        process_bit(fd_dst, found_eof, encodings_tree, current_node, bit);
+        if (*found_eof)
+            break;
+        byte_int = byte_int - bit * power;
+        power = power / 2;
+    }
+}
+
+void skip_header_read(int fd_src, char *read_buf) {
+    int nb_consecutive_stops = 1;
+    while (1) {
+        if (!read_from_buffer(fd_src, read_buf))
+            break;
+        if (read_buf[0] == '\0')
+            nb_consecutive_stops++;
+        else
+            nb_consecutive_stops = 0;
+        if (nb_consecutive_stops >= 3) {
+            break;
+        }
+    }
 }
 
 void write_decompressed_output(huffman_tree_t *encodings_tree, const char *input_file, const char *output_file) {
@@ -354,82 +392,19 @@ void write_decompressed_output(huffman_tree_t *encodings_tree, const char *input
         exit(1);
     }
 
-    int end_of_header = 0;
-    int nb_consecutive_stops = 1;
-    char header_buffer[IO_BUF_SIZE];
-    int header_buffer_index = IO_BUF_SIZE;
-    char read_buffer[IO_BUF_SIZE];
-    int read_buffer_index = IO_BUF_SIZE;
-    char write_buffer[IO_BUF_SIZE];
-    int write_buffer_index = 0;
+    char read_buf[1];
 
-    // Skip header
-    while (!end_of_header) {
-        if (header_buffer_index >= IO_BUF_SIZE) {
-            header_buffer_index = 0;
-            if (read(fd_src, header_buffer, IO_BUF_SIZE) < 0) {
-                break;
-            }
-        }
-        if (header_buffer[header_buffer_index] == '\0')
-            nb_consecutive_stops++;
-        else
-            nb_consecutive_stops = 0;
-        header_buffer_index++;
-        
-        // Fill read_buffer with the end of header_buffer (after the stop) and complete up to IO_BUF_SIZE chars
-        if (nb_consecutive_stops >= 3) {
-            for (int i = 0; i < IO_BUF_SIZE - header_buffer_index; i++) {
-                read_buffer[i] = header_buffer[header_buffer_index + i];
-            }
-            read_buffer_index = IO_BUF_SIZE - header_buffer_index;
-            read(fd_src, read_buffer+read_buffer_index, header_buffer_index);
-            read_buffer_index = 0;
-            end_of_header = 1;
-        }
-    }
+    skip_header_read(fd_src, read_buf);
 
     // Go through the tree node by node, left when bit=0 and right when bit=1
     // If the tree node contains a character then we stop and start again from the root
     huffman_tree_t *current_node = encodings_tree;
     int found_eof = 0;
     while (!found_eof) {
-        // Read 512 chars when the end of the read buffer is reached
-        if (read_buffer_index >= IO_BUF_SIZE) {
-            read_buffer_index = 0;
-            if (read(fd_src, read_buffer, IO_BUF_SIZE) < 0) {
-                break;
-            }
-        }
-        unsigned char byte = read_buffer[read_buffer_index];
-        int byte_int = byte;
-        int power = 128;
-        for (int i = 0; i < 8; i++) {
-            int bit = byte_int / power;
-            if (bit == 0)
-                current_node = current_node->left;
-            else
-                current_node = current_node->right;
-            if (current_node->character != NULL) {
-                // printf("%c", current_node->character[0]);
-                if (strcmp(current_node->character, "\\0") == 0) {
-                    found_eof = 1;
-                    flush_write_buffer(fd_dst, write_buffer, write_buffer_index);
-                    break;
-                }
-                write_buffer[write_buffer_index] = current_node->character[0];
-                write_buffer_index++;
-                // Write 512 chars when the write buffer is full
-                if (write_buffer_index >= IO_BUF_SIZE) {
-                    write(fd_dst, write_buffer, IO_BUF_SIZE);
-                    write_buffer_index = 0;
-                }
-                current_node = encodings_tree;
-            }
-            byte_int = byte_int - bit * power;
-            power = power / 2;
-        }
-        read_buffer_index++;
+        if (!read_from_buffer(fd_src, read_buf))
+            break;
+        unsigned char byte = read_buf[0];
+        decode_byte(fd_dst, &found_eof, encodings_tree, &current_node, byte);
     }
 
     close(fd_src);

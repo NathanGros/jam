@@ -35,9 +35,9 @@ int main(int argc, char *argv[]) {
 
     int print_time = 1;
     clock_t timer_start;
-    
     if (print_time)
         timer_start = clock();
+
     // Retrieve encodings tree from the compressed file header
     huffman_tree_t *encodings_tree = retrieve_encodings(input_file);
 
