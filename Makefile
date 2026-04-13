@@ -5,8 +5,8 @@ CFLAGS = -Wall
 LDFLAGS = -lm
 
 COMMON = huffman_tree.o input_output.o queue.o
-COMPRESSOR = compressor.o $(COMMON)
-DECOMPRESSOR = decompressor.o $(COMMON)
+COMPRESSOR = jam.o compress.o $(COMMON)
+DECOMPRESSOR = unjam.o decompress.o $(COMMON)
 
 all: jam unjam softclean
 

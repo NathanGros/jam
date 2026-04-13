@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "input_output.h"
+#include "decompress.h"
 #include "huffman_tree.h"
 
 void print_usage() {
@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
             exit(1);
     }
 
-    int print_time = 1;
+    int print_time = 0;
     clock_t timer_start;
     if (print_time)
         timer_start = clock();

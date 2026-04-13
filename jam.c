@@ -3,7 +3,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "input_output.h"
+#include "compress.h"
 #include "queue.h"
 #include "huffman_tree.h"
 
@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
             exit(1);
     }
     
-    int print_time = 1;
+    int print_time = 0;
     clock_t timer_start;
     clock_t timer_current;
     if (print_time) {
