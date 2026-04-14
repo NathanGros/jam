@@ -1,5 +1,6 @@
 # The Jam compressor
-Jam is a lossless text file compression tool written in C, using Huffman compression.
+Jam is a lossless text file compression tool written in C, using Huffman coding.
+
 I tried optimizing time performance as much as I could.
 
 ## Usage
@@ -22,9 +23,10 @@ $ unjam <input> [output]
 
 ### Compression ratio
 The ratio `compressed_size / original_size` gets smaller as the original size gets bigger.
-It appears that for a very big file, the compressed file will be **about 60% of the original size**.
+
+It appears that for a very big file, the compressed file will be **about 60% of the original size** (40% size reduction).
 
 ### Time performannce
 On my not so recent laptop:
-- The compressor takes about **29ms** to compress a 250Ko file into a 150Ko file *(not optimized yet)*
-- The decompressor takes about **30ms** to decompress a 150Ko file back into a 250Ko file
+- The compressor takes about **220ms** to compress a 2.9 Mo file into a 1.6 Mo file
+- The decompressor takes about **250ms** to decompress a 1.6 Mo file back into a 2.9 Mo file
