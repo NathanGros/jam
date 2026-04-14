@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
     
     clock_t timer_start;
     clock_t timer_current;
-    if (DEBUG) {
+    if (DEBUG >= 1) {
         timer_start = clock();
         timer_current = timer_start;
     }
@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
         occurences[i] = 0;
     }
     get_occurences(input_file, occurences);
-    if (DEBUG) {
+    if (DEBUG == 2) {
         double elapsed = (double)(clock() - timer_current) / CLOCKS_PER_SEC;
         timer_current = clock();
         printf("Got occurences queue in %fs\n", elapsed);
@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
 
     // Build Huffman tree from queue
     huffman_tree_t *tree = build_huffman_tree(occurences);
-    if (DEBUG) {
+    if (DEBUG == 2) {
         double elapsed = (double)(clock() - timer_current) / CLOCKS_PER_SEC;
         timer_current = clock();
         printf("Built Huffman tree in %fs\n", elapsed);
@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
         character_encodings[i] = NULL;
     }
     build_encodings(tree, character_encodings);
-    if (DEBUG) {
+    if (DEBUG == 2) {
         double elapsed = (double)(clock() - timer_current) / CLOCKS_PER_SEC;
         timer_current = clock();
         printf("Built encodings in %fs\n", elapsed);
@@ -71,15 +71,15 @@ int main(int argc, char *argv[]) {
 
     // Generate output: encoding table + encoded text
     write_compressed_output(character_encodings, input_file, output_file);
-    if (DEBUG) {
+    if (DEBUG == 2) {
         double elapsed = (double)(clock() - timer_current) / CLOCKS_PER_SEC;
         timer_current = clock();
         printf("wrote output in %fs\n", elapsed);
     }
 
-    if (DEBUG) {
+    if (DEBUG >= 1) {
         double elapsed = (double)(clock() - timer_start) / CLOCKS_PER_SEC;
-        printf("Total: %fs\n", elapsed);
+        printf("Total compression time: %fs\n", elapsed);
     }
     return 0;
 }

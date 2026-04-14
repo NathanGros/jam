@@ -37,14 +37,14 @@ int main(int argc, char *argv[]) {
 
     clock_t timer_start;
     clock_t timer_current;
-    if (DEBUG) {
+    if (DEBUG >= 1) {
         timer_start = clock();
         timer_current = timer_start;
     }
 
     // Retrieve encodings tree from the compressed file header
     huffman_tree_t *encodings_tree = retrieve_encodings(input_file);
-    if (DEBUG) {
+    if (DEBUG == 2) {
         double elapsed = (double)(clock() - timer_current) / CLOCKS_PER_SEC;
         timer_current = clock();
         printf("Retrieved encodings in %fs\n", elapsed);
@@ -52,15 +52,15 @@ int main(int argc, char *argv[]) {
 
     // Decompress and write to the output file
     write_decompressed_output(encodings_tree, input_file, output_file);
-    if (DEBUG) {
+    if (DEBUG == 2) {
         double elapsed = (double)(clock() - timer_current) / CLOCKS_PER_SEC;
         timer_current = clock();
         printf("Decompressed in %fs\n", elapsed);
     }
 
-    if (DEBUG) {
+    if (DEBUG >= 1) {
         double elapsed = (double)(clock() - timer_start) / CLOCKS_PER_SEC;
-        printf("Total: %fs\n", elapsed);
+        printf("Total decompression time: %fs\n", elapsed);
     }
     return 0;
 }
